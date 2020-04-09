@@ -118,9 +118,28 @@ docker exec kind-worker 'curl 172.17.0.4:30500'
 iptables -L -t nat | grep votingapp
 
 # ----------------------DEPLOYMENT-----------------------
-kubectl create deployment votingapp \
---image=paulopez/votingapp:0.1 \
--v 9
+cat <<EOF | kubectl apply -f -
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: votingapp
+spec:
+  minReadySeconds: 30
+  strategy:
+    type: RollingUpdate
+  replicas: 3
+  selector:
+    matchLabels:
+      app: votingapp
+  template:
+    metadata:
+      labels:
+        app: votingapp
+    spec:
+      containers:
+        - image: paulopez/votingapp:0.1
+          name: votingapp
+EOF
 
 kubectl set image deployment/votingapp \
 votingapp=votingapp:0.2-beta \
