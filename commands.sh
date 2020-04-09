@@ -1,25 +1,26 @@
 #!/bin/bash
 
+# -------------------- SETUP -------------------------
 # CREATE K8s CLUSTER
-kind create cluster --config kind/kind.yaml
+kind create cluster --config kind.yaml
 
-# NAMESPACE
+# CREATE NAMESPACE
+kubectl delete namespace votingapp
 kubectl create namespace votingapp
 
-# ----------- POD ----------------
+# -------------------------- POD ---------------------------
 kubectl run votingapp \
 --image=paulopez/votingapp:0.1 \
 --generator=run-pod/v1 \
 -v=9 
 
-# check k8s control plane components running
-kubectl get pods -n kube-system | grep kube
+# verify is up and running
+kubectl logs votingapp
 
-# KUBELET
-# kind
+# check k8s control plane components running
+kubectl get nodes -o wide
+kubectl get pods -n kube-system | grep kube
 docker exec kind-worker ps -aux | grep kubelet
-# minikube
-minikube ssh && pgrep kubelet
 
 # Get pods from etcd
 ./etcd.sh "/registry/pods/votingapp"
@@ -28,7 +29,11 @@ minikube ssh && pgrep kubelet
 kubectl get events --watch
 kubectl describe pod votingapp
 
-# ----------REPLICA SET----------
+# check pod is running with debug tool
+kubectl get pods -o wide
+./debug.sh
+
+# ----------------------REPLICA SET------------------------
 cat <<EOF | kubectl apply -f -
 apiVersion: apps/v1
 kind: ReplicaSet
@@ -54,13 +59,15 @@ EOF
 # replicaset workflow
 kubectl get events --watch
 kubectl describe replicaset votingapp
-kubectl label pod votingapp app=votingapp-beta
-kubectl label pod votingapp app=votingapp
+kubectl get pods -l app=votingapp
+
+kubectl label pod votingapp-xxx app=votingapp-bug
+kubectl label pod votingapp-xxx app=votingapp
 
 # Get rs from etcd
 ./etcd.sh "/registry/replicasets/votingapp"
 
-# ----------SERVICE----------
+# ---------------------SERVICE-----------------------------
 kubectl expose replicaset votingapp \
 --port=8080 \
 --target-port=5000 \
@@ -70,7 +77,27 @@ kubectl expose replicaset votingapp \
 # Get service from etcd
 ./etcd.sh "/registry/services/votingapp"
 
-# ----------DEPLOYMENT----------
+# test cluster IP with debug tools
+./debug.sh
+
+# watch endpoints resource changing replicas from replicaset
+kubectl scale replicaset votingapp --replicas 5
+
+# NodePort type (nodePort=30500)
+kubectl edit svc votingapp
+docker exec kind-worker 'curl 172.17.0.4:30500'
+
+# iptables
+iptables -L -t nat | grep votingapp
+
+# ----------------------DEPLOYMENT-----------------------
+kubectl create deployment votingapp \
+--image=paulopez/votingapp:0.1 \
+-v 9
+
+kubectl set image deployment/votingapp \
+votingapp=votingapp:0.2-beta \
+-v 9
 
 # Get deployment from etcd
 ./etcd.sh "/registry/deployments/votingapp"
