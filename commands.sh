@@ -14,6 +14,19 @@ kubectl run votingapp \
 --generator=run-pod/v1 \
 -v=9 
 
+cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    run: votingapp
+  name: votingapp
+spec:
+  containers:
+    - image: paulopez/votingapp:0.1
+      name: votingapp
+EOF
+
 # verify is up and running
 kubectl logs votingapp
 
@@ -73,6 +86,20 @@ kubectl expose replicaset votingapp \
 --target-port=5000 \
 --type=ClusterIP \
 -v=9
+
+cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: Service
+metadata:
+  name: votingapp
+spec:
+  ports:
+  - port: 8080
+    targetPort: 5000
+  selector:
+    app: votingapp
+  type: ClusterIP
+EOF
 
 # Get service from etcd
 ./etcd.sh "/registry/services/votingapp"
