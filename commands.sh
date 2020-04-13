@@ -3,17 +3,13 @@
 # -------------------- SETUP -------------------------
 # CREATE K8s CLUSTER
 kind create cluster --config kind.yaml
+kubectl get nodes
 
 # CREATE NAMESPACE
 kubectl delete namespace votingapp
 kubectl create namespace votingapp
 
 # -------------------------- POD ---------------------------
-kubectl run votingapp \
---image=paulopez/votingapp:0.1 \
---generator=run-pod/v1 \
--v=9 
-
 cat <<EOF | kubectl apply -f -
 apiVersion: v1
 kind: Pod
@@ -81,12 +77,6 @@ kubectl label pod votingapp-xxx app=votingapp
 ./etcd.sh "/registry/replicasets/votingapp"
 
 # ---------------------SERVICE-----------------------------
-kubectl expose replicaset votingapp \
---port=8080 \
---target-port=5000 \
---type=ClusterIP \
--v=9
-
 cat <<EOF | kubectl apply -f -
 apiVersion: v1
 kind: Service
@@ -112,7 +102,7 @@ kubectl scale replicaset votingapp --replicas 5
 
 # NodePort type (nodePort=30500)
 kubectl edit svc votingapp
-docker exec kind-worker 'curl 172.17.0.4:30500'
+docker exec kind-worker sh -c 'curl 172.17.0.4:30500/vote'
 
 # iptables
 iptables -L -t nat | grep votingapp
@@ -141,9 +131,18 @@ spec:
           name: votingapp
 EOF
 
+# setup watchers for testing rolling update
+watch "kubectl get pods --show-labels"
+kubectl get endpoints -w
+watch "kubectl get rs"
+watch "kubectl get deployments"
+watch "docker exec kind-worker sh -c 'curl 172.17.0.4:30500'"
+
+# trigger rolling update
 kubectl set image deployment/votingapp \
-votingapp=votingapp:0.2-beta \
+votingapp=paulopez/votingapp:0.2-beta \
 -v 9
+
 
 # Get deployment from etcd
 ./etcd.sh "/registry/deployments/votingapp"
