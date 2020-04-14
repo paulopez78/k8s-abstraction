@@ -141,11 +141,11 @@ spec:
 EOF
 
 # setup watchers for testing rolling update
-watch "kubectl get pods --show-labels"
+watch "kubectl get pods --show-labels -o wide"
 kubectl get endpoints -w
-watch "kubectl get rs"
-watch "kubectl get deployments"
-watch "docker exec kind-worker sh -c 'curl 172.17.0.4:30500'"
+watch "kubectl get rs -o wide"
+watch "kubectl get deployments -o wide"
+watch "docker exec kind-worker sh -c 'curl 172.17.0.4:30500 --silent' | grep h1"
 
 # trigger rolling update
 kubectl set image deployment/votingapp \
