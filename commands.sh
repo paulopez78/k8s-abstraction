@@ -8,6 +8,8 @@ kubectl get nodes
 # CREATE NAMESPACE
 kubectl delete namespace votingapp
 kubectl create namespace votingapp
+kubectl get namespaces 
+kubens votingapp
 
 # -------------------------- POD ---------------------------
 cat <<EOF | kubectl apply -f -
@@ -28,7 +30,7 @@ kubectl logs votingapp
 
 # check k8s control plane components running
 kubectl get nodes -o wide
-kubectl get pods -n kube-system | grep kube
+kubectl get pods -n kube-system -o wide | grep kind-control-plane
 docker exec kind-worker ps -aux | grep kubelet
 
 # Get pods from etcd
@@ -43,6 +45,7 @@ kubectl get pods -o wide
 ./debug.sh
 
 # ----------------------REPLICA SET------------------------
+kubectl delete pod votingapp
 cat <<EOF | kubectl apply -f -
 apiVersion: apps/v1
 kind: ReplicaSet
@@ -70,7 +73,11 @@ kubectl get events --watch
 kubectl describe replicaset votingapp
 kubectl get pods -l app=votingapp
 
-kubectl label pod votingapp-xxx app=votingapp-bug
+# delete random pod
+kubectl delete pod votingapp-xxx 
+
+# relabel pods
+kubectl label pod votingapp-xxx app=votingapp-debug
 kubectl label pod votingapp-xxx app=votingapp
 
 # Get rs from etcd
@@ -94,10 +101,12 @@ EOF
 # Get service from etcd
 ./etcd.sh "/registry/services/votingapp"
 
-# test cluster IP with debug tools
+# test cluster IP and Pod IP with debug tools
 ./debug.sh
 
 # watch endpoints resource changing replicas from replicaset
+watch "kubectl get pods -o wide --show-labels"
+kubectl get ep -w
 kubectl scale replicaset votingapp --replicas 5
 
 # NodePort type (nodePort=30500)
@@ -142,7 +151,6 @@ watch "docker exec kind-worker sh -c 'curl 172.17.0.4:30500'"
 kubectl set image deployment/votingapp \
 votingapp=paulopez/votingapp:0.2-beta \
 -v 9
-
 
 # Get deployment from etcd
 ./etcd.sh "/registry/deployments/votingapp"
