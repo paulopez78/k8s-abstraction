@@ -147,6 +147,9 @@ watch "kubectl get rs -o wide"
 watch "kubectl get deployments -o wide"
 watch "docker exec kind-worker sh -c 'curl 172.17.0.4:30500 --silent' | grep h1"
 
+./debug.sh 
+while true; do curl votingapp:8080 --silent | grep h1; sleep 2; done
+
 # trigger rolling update
 kubectl set image deployment/votingapp \
 votingapp=paulopez/votingapp:0.2-beta \
